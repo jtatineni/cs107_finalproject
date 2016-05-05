@@ -1,0 +1,176 @@
+---
+title: "Insurance purchase prediction"
+output: html_document
+---
+
+**This project is done in submission to the CS107 class final project requirement**
+
+In this project I will try to predict the purchase of a specific insurance package (package G) based on the transaction history of other purchases and also the user related data.
+
+The reson for choosing the G insurance package is, referring to the competition forums, G is the main variable that changes from year to year
+Coming up with a model to predict the G value correctly led to very good results on the test data set
+
+## Loading Data
+
+Data for this project is taken from the kaggle website where the competition is hosted. Due to the limitations of data set size and current PC limitations, I will be using only the test data set
+
+I downloaded the data from website and stored it in my local repository
+
+```{r}
+library(readr)
+library(dplyr)
+test <- read.csv ('test_v2.csv', header=T, stringsAsFactors = F)
+```
+
+### Data clean up
+
+In this step we will be eliminating all the rows with incomplete data
+
+```{r}
+test <- na.omit(test)
+```
+
+Also we will be removing the columns that are not used for the prediction. 
+We will be excluding the day, time and cost columns in this analysis
+
+```{r}
+test <- test[, !(colnames(test) %in% c("day","time","cost"))]
+```
+
+### Checking the colum type of G
+```{r}
+is.factor(test$G)
+```
+ 
+upon checking we notice that this is not currently stored as factor variable. 
+We will converting this column variable to a factor.
+```{r}
+test$G = as.factor(test$G)
+```
+
+### Building Model
+
+In first step, we will try building a multinomial logistic regression model. 
+For this we will be using the multinom function from nnet package
+
+```{r}
+test$G2 <- relevel(test$G, ref = "1")
+
+library(nnet)
+```
+
+Also we will be first trying to predict G based on the purchases of other insurance packages (A to F)
+
+```{r}
+model1 <- multinom(G2 ~ A+B+C+D+E+F, data = test)
+
+summary(model1)
+```
+
+Now that we have built our first model, we will try identifying the significant variables for this model. 
+For this will be building the z score and p values
+
+```{r}
+z <- summary(model1)$coefficients/summary(model1)$standard.errors
+z
+```
+
+```{r}
+p <- (1 - pnorm(abs(z), 0, 1))*2
+p
+```
+Notice that almost all the variables are significant in predicting G
+
+
+### Multinomial regression with all variables
+
+We will now try to implement a similar model including all the variables
+
+```{r}
+model2 <- multinom(G2 ~ ., data = test)
+
+summary(model2)
+```
+
+Using the new model to build a prediction data set
+
+```{r}
+predicted = predict(model2,test,type="probs")
+head(predicted)
+```
+
+```{r}
+bpp=cbind(test, predicted)
+head(bpp)
+```
+
+### Trying Ordinal Logistic Regresssion (OLR) approach
+
+```{r}
+library(foreign)
+library(ggplot2)
+library(MASS)
+library(Hmisc)
+```
+
+```{r}
+olr_model1 <- polr(G2 ~ A+B+C+D+E+F, data = test, Hess=TRUE)
+summary(olr_model1)
+```
+
+we will try identifying the significant variables for this model. 
+For this will be building the z score and p values
+
+```{r}
+ctable <- coef(summary(olr_model1))
+ctable
+```
+
+```{r}
+ctable <- coef(summary(olr_model1))
+ctable
+```
+
+```{r}
+p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+
+ctable <- cbind(ctable, "p value" = p)
+ctable
+```
+
+
+### Trying OLR approach with all the variables included
+
+```{r}
+# olr_model2 <- polr(G2 ~ ., data = test, Hess=TRUE)
+```
+
+When we try the OLR model with variables we notice that the fit doesn't converge
+
+
+
+### Refernces
+https://www.kaggle.com/c/allstate-purchase-prediction-challenge
+http://www.ats.ucla.edu/stat/r/dae/mlogit.htm
+http://www.r-bloggers.com/how-to-multinomial-regression-models-in-r/
+http://www.analyticsvidhya.com/blog/2016/02/multinomial-ordinal-logistic-regression/
+https://github.com/justmarkham/kaggle-allstate
+https://github.com/B1aine/kaggle-allstate
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
